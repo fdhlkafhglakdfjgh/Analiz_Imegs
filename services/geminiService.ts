@@ -1,12 +1,14 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
+const getAiClient = () => {
+  // This check is safe to run in a browser environment where `process` is not defined.
+  const API_KEY = typeof process === 'object' && process.env ? process.env.API_KEY : undefined;
 
-if (!API_KEY) {
-  console.error("API_KEY environment variable not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+  if (!API_KEY) {
+    throw new Error("API key is not configured. Please ensure the API_KEY environment variable is set.");
+  }
+  return new GoogleGenAI({ apiKey: API_KEY });
+};
 
 interface ImageEditParams {
   base64Image: string;
@@ -15,11 +17,9 @@ interface ImageEditParams {
 }
 
 export const editImage = async ({ base64Image, mimeType, prompt }: ImageEditParams): Promise<string> => {
-  if (!API_KEY) {
-    throw new Error("API key is not configured. Please ensure the API_KEY environment variable is set.");
-  }
-  
   try {
+    const ai = getAiClient(); // Throws an error if API_KEY is missing
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -51,8 +51,9 @@ export const editImage = async ({ base64Image, mimeType, prompt }: ImageEditPara
 
   } catch (error) {
     console.error("Error editing image with Gemini API:", error);
+    // Propagate the error to be handled by the UI component
     if (error instanceof Error) {
-        throw new Error(`Failed to edit image: ${error.message}`);
+        throw error; // Re-throw the original error (e.g., from getAiClient)
     }
     throw new Error("An unknown error occurred while editing the image.");
   }
